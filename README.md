@@ -214,3 +214,13 @@ python -m playwright install chromium
 ## License
 
 MIT © [Hogan Dong](https://github.com/HoganDong486)
+
+---
+
+### Part of the Hogan Dong Agent Stack
+
+This project is the **browser layer** in a multi-agent platform:
+
+> **[AgentForge](https://github.com/HoganDong486/agentforge)** orchestrates multi-agent workflows and can use this MCP server as its browser tool.
+>
+> See also: [MCP Toolkit](https://github.com/HoganDong486/mcp-server-toolkit) · [RAG Agent](https://github.com/HoganDong486/rag-research-agent) · [Agent Playground](https://github.com/HoganDong486/multi-agent-playground)
