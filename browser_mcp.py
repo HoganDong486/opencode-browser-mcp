@@ -98,56 +98,48 @@ def _build_snapshot() -> str:
     page = _active()
     global _uid_map
     _uid_map = {}
-    uid_counter = [0]
 
-    def traverse(el, depth=0, path=""):
-        uid_counter[0] += 1
-        uid = f"el_{uid_counter[0]}"
-        tag = page.evaluate("el => el.tagName.toLowerCase()", el)
-        role = page.evaluate("el => el.getAttribute('role') || ''", el)
-        text = page.evaluate("el => (el.textContent || '').trim().slice(0, 80)", el)
-        visible = page.evaluate(
-            "el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 }", el
-        )
-        if not visible:
-            return ""
+    result = page.evaluate("""() => {
+      const map = {};
+      let uid = 0;
+      const lines = [];
 
-        indent = "  " * depth
-        label = f"{tag}"
-        if role:
-            label += f"[role={role}]"
-        if text:
-            label += f' "{text}"'
+      function walk(el, depth) {
+        if (uid > 300 || depth > 20) return;
+        uid++;
+        const id = 'el_' + uid;
+        const tag = el.tagName.toLowerCase();
+        const role = el.getAttribute('role') || '';
+        const text = (el.textContent || '').trim().slice(0, 80);
+        const rect = el.getBoundingClientRect();
+        const visible = rect.width > 0 && rect.height > 0;
 
-        children = page.evaluate("el => el.children.length", el)
-        selectors = page.evaluate(
-            "el => el.id ? '#' + el.id : el.className ? '.' + el.className.split(' ')[0] : el.tagName.toLowerCase()",
-            el,
-        )
-        _uid_map[uid] = {
-            "tag": tag, "role": role, "text": text, "selector": selectors,
-            "visible": visible, "_element": el,
+        if (!visible) return;
+
+        let label = tag;
+        if (role) label += '[role=' + role + ']';
+        if (text) label += ' ' + JSON.stringify(text);
+
+        const indent = '  '.repeat(depth);
+        lines.push(indent + '[' + id + '] ' + label);
+
+        map[id] = {
+          tag: tag, role: role, text: text,
+          selector: el.id ? '#' + el.id : el.className ? '.' + el.className.split(' ')[0] : tag,
+          visible: visible
+        };
+
+        for (let i = 0; i < el.children.length; i++) {
+          walk(el.children[i], depth + 1);
         }
+      }
 
-        line = f"{indent}[{uid}] {label}"
-        if depth > 15 or uid_counter[0] > 200:
-            return line
+      if (document.body) walk(document.body, 0);
+      return {lines: lines.slice(0, 200).join('\\n'), map: map};
+    }""")
 
-        child_lines = []
-        for i in range(children):
-            child = page.evaluate("(el, i) => el.children[i]", el, i)
-            child_result = traverse(child, depth + 1)
-            if child_result:
-                child_lines.append(child_result)
-
-        if child_lines:
-            return line + "\n" + "\n".join(child_lines)
-        return line
-
-    body = page.evaluate("() => document.body")
-    if not body:
-        return "(page not loaded)"
-    return traverse(body)
+    _uid_map = result["map"]
+    return result["lines"] or "(page not loaded)"
 
 
 # ── Navigation Tools ────────────────────────────────────────
@@ -250,40 +242,57 @@ def snapshot(args: dict) -> dict:
         return err(f"Snapshot failed: {e}")
 
 
+def _resolve(uid: str | None, selector: str | None) -> str | None:
+    """Resolve a UID to a CSS selector, or return the raw selector."""
+    if uid and uid in _uid_map:
+        sel = _uid_map[uid].get("selector", "")
+        return sel or uid
+    return selector
+
+
 def click(args: dict) -> dict:
-    uid = args.get("uid")
-    selector = args.get("selector")
-    page = _active()
+    target = _resolve(args.get("uid"), args.get("selector"))
+    if not target:
+        return err("Provide uid or selector")
     try:
-        if uid and uid in _uid_map:
-            el = _uid_map[uid]["_element"]
-            el.click(timeout=TIMEOUT_MS)
-            return ok(f"Clicked: [{uid}]")
-        elif selector:
-            page.click(selector, timeout=TIMEOUT_MS)
-            return ok(f"Clicked: {selector}")
-        else:
-            return err("Provide uid or selector")
+        _active().click(target, timeout=TIMEOUT_MS)
+        return ok(f"Clicked: {target}")
     except Exception as e:
         return err(f"Click failed: {e}")
 
 
 def fill(args: dict) -> dict:
-    uid = args.get("uid")
-    selector = args.get("selector")
-    value = args["value"]
-    page = _active()
+    target = _resolve(args.get("uid"), args.get("selector"))
+    if not target:
+        return err("Provide uid or selector")
     try:
-        if uid and uid in _uid_map:
-            el = _uid_map[uid]["_element"]
-            el.fill(value, timeout=TIMEOUT_MS)
-        elif selector:
-            page.fill(selector, value, timeout=TIMEOUT_MS)
-        else:
-            return err("Provide uid or selector")
-        return ok(f"Filled")
+        _active().fill(target, args["value"], timeout=TIMEOUT_MS)
+        return ok(f"Filled: {target}")
     except Exception as e:
         return err(f"Fill failed: {e}")
+
+
+def hover(args: dict) -> dict:
+    target = _resolve(args.get("uid"), args.get("selector"))
+    if not target:
+        return err("Provide uid or selector")
+    try:
+        _active().hover(target, timeout=TIMEOUT_MS)
+        return ok(f"Hovered: {target}")
+    except Exception as e:
+        return err(f"Hover failed: {e}")
+
+
+def drag(args: dict) -> dict:
+    from_sel = _resolve(args.get("from_uid"), None)
+    to_sel = _resolve(args.get("to_uid"), None)
+    if not from_sel or not to_sel:
+        return err("Provide from_uid and to_uid from a snapshot")
+    try:
+        _active().drag_and_drop(from_sel, to_sel, timeout=TIMEOUT_MS)
+        return ok(f"Dragged {from_sel} -> {to_sel}")
+    except Exception as e:
+        return err(f"Drag failed: {e}")
 
 
 def fill_form(args: dict) -> dict:
@@ -291,47 +300,16 @@ def fill_form(args: dict) -> dict:
     page = _active()
     results = []
     for f in fields:
+        target = _resolve(f.get("uid"), f.get("selector"))
+        if not target:
+            results.append("  Skipped: no uid or selector")
+            continue
         try:
-            sel = f.get("uid") or f.get("selector")
-            val = f.get("value", "")
-            if f.get("uid") and f["uid"] in _uid_map:
-                _uid_map[f["uid"]]["_element"].fill(val, timeout=TIMEOUT_MS)
-            else:
-                page.fill(sel, val, timeout=TIMEOUT_MS)
-            results.append(f"  Filled: {sel}")
+            page.fill(target, f.get("value", ""), timeout=TIMEOUT_MS)
+            results.append(f"  Filled: {target}")
         except Exception as e:
-            results.append(f"  Failed: {sel} — {e}")
-    return ok("Form fill results:\n" + "\n".join(results))
-
-
-def hover(args: dict) -> dict:
-    uid = args.get("uid")
-    selector = args.get("selector")
-    page = _active()
-    try:
-        if uid and uid in _uid_map:
-            _uid_map[uid]["_element"].hover(timeout=TIMEOUT_MS)
-        elif selector:
-            page.hover(selector, timeout=TIMEOUT_MS)
-        else:
-            return err("Provide uid or selector")
-        return ok(f"Hovered")
-    except Exception as e:
-        return err(f"Hover failed: {e}")
-
-
-def drag(args: dict) -> dict:
-    from_uid = args.get("from_uid")
-    to_uid = args.get("to_uid")
-    if not from_uid or not to_uid:
-        return err("Provide from_uid and to_uid")
-    if from_uid not in _uid_map or to_uid not in _uid_map:
-        return err("Invalid uid. Take a snapshot first.")
-    try:
-        _uid_map[from_uid]["_element"].drag_to(_uid_map[to_uid]["_element"])
-        return ok(f"Dragged [{from_uid}] → [{to_uid}]")
-    except Exception as e:
-        return err(f"Drag failed: {e}")
+            results.append(f"  Failed: {target} — {e}")
+    return ok("Form fill:\n" + "\n".join(results))
 
 
 def press_key(args: dict) -> dict:
@@ -363,7 +341,11 @@ def screenshot(args: dict) -> dict:
     page = _active()
     try:
         if uid and uid in _uid_map:
-            _uid_map[uid]["_element"].screenshot(path=path)
+            target = _uid_map[uid].get("selector", "")
+            if target:
+                page.locator(target).screenshot(path=path)
+            else:
+                page.screenshot(path=path)
         else:
             page.screenshot(path=path, full_page=full)
         return ok(f"Screenshot: {path}")
