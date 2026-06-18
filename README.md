@@ -23,8 +23,12 @@ OpenCode is growing fast. There are browser MCPs for Claude Code (Chrome DevTool
 
 | Feature | Detail |
 |---------|--------|
-| **9 Tools** | Navigate, click, fill forms, screenshot, extract text/HTML/links, run JavaScript |
-| **Cross-Browser** | Chromium, Firefox, WebKit—pick any via Playwright |
+| **30 Tools** | 7 categories: Navigation, Automation, Inspection, Debugging, Emulation, Performance, Management |
+| **Snapshot + UIDs** | Accessibility-tree snapshot with unique element IDs — inspired by Chrome DevTools MCP |
+| **Multi-Tab** | Open, switch, and close multiple browser tabs in one session |
+| **Console & Network** | View browser console logs and network requests for full-stack debugging |
+| **Cross-Browser** | Chromium, Firefox, WebKit — pick any via Playwright |
+| **Device Emulation** | Mobile viewport, dark mode, geolocation spoofing, offline mode |
 | **Headless by Default** | No visible window. Runs in the background |
 | **Safety Sandbox** | Fresh browser instance per session. No cookies from host machine |
 | **Domain Allowlist** | Restrict which sites the agent can access |
@@ -64,17 +68,40 @@ python -m playwright install chromium
 
 ### Tools Reference
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `browser_navigate` | Navigate to a URL | `url` (required) |
-| `browser_screenshot` | Capture screenshot | `path`, `full_page` |
-| `browser_get_text` | Extract visible text | — |
-| `browser_get_html` | Get page HTML | — |
-| `browser_get_links` | List all links | — |
-| `browser_click` | Click element | `selector` (CSS) |
-| `browser_fill` | Fill input field | `selector`, `value` |
-| `browser_execute_js` | Run JavaScript | `code` |
-| `browser_cleanup` | Close browser | — |
+| Category | Tool | Description |
+|----------|------|-------------|
+| **Navigation** | `navigate_page` | Navigate to a URL |
+| | `new_page` | Open a URL in a new tab |
+| | `list_pages` | List all open tabs |
+| | `select_page` | Switch to a tab by index |
+| | `close_page` | Close a tab |
+| | `wait_for` | Wait for text to appear on the page |
+| | `handle_dialog` | Accept or dismiss browser dialogs |
+| **Automation** | `take_snapshot` | Accessibility tree snapshot with element UIDs |
+| | `click` | Click element by UID or CSS selector |
+| | `fill` | Fill input field by UID or CSS selector |
+| | `fill_form` | Batch fill multiple form fields at once |
+| | `hover` | Hover over an element |
+| | `drag` | Drag one element onto another |
+| | `press_key` | Press a key or combination (e.g., `Enter`, `Control+A`) |
+| | `type_text` | Type text using keyboard (emulates real typing) |
+| | `upload_file` | Upload a file via a file input |
+| **Inspection** | `screenshot` | Take a screenshot of page or element |
+| | `get_text` | Extract all visible text |
+| | `get_html` | Get full HTML source |
+| | `get_links` | List all links on the page |
+| | `execute_js` | Execute JavaScript and return result |
+| **Debugging** | `list_console_messages` | List browser console logs (errors, warnings, info) |
+| | `get_console_message` | Get a specific console message |
+| | `list_network_requests` | List recent network requests (XHR, fetch, scripts) |
+| | `get_network_request` | Get details of a network request |
+| **Emulation** | `emulate` | Emulate device features (viewport, dark mode, geolocation, offline) |
+| | `resize_page` | Resize the page viewport |
+| **Performance** | `performance_start_trace` | Start measuring page load performance |
+| | `performance_stop_trace` | Stop tracing and get Core Web Vitals metrics |
+| **Management** | `cleanup` | Close browser and clean up all sessions |
+
+**30 tools total** across 7 categories.
 
 ### Configuration
 
@@ -102,8 +129,12 @@ python -m playwright install chromium
 
 | 特性 | 详情 |
 |------|------|
-| **9 个工具** | 导航、点击、填表、截图、提取文本/HTML/链接、执行 JavaScript |
+| **30 个工具** | 7 个类别：导航、自动化、检查、调试、模拟、性能、管理 |
+| **快照 + UID** | 无障碍树快照 + 唯一元素 ID——借鉴 Chrome DevTools MCP 的设计 |
+| **多标签页** | 同时打开、切换、关闭多个浏览器标签 |
+| **控制台 & 网络** | 查看浏览器 console 日志和网络请求，实现全栈调试 |
 | **跨浏览器** | Chromium / Firefox / WebKit 任选 |
+| **设备模拟** | 移动端视口、暗色模式、GPS 伪装、离线模式 |
 | **无头模式** | 默认不弹窗口，后台静默运行 |
 | **安全沙箱** | 每次启动独立浏览器，不携带宿主机 Cookie |
 | **域名白名单** | 限制 Agent 只能访问指定域名 |
@@ -160,7 +191,23 @@ python -m playwright install chromium
 **A:** GitHub blocks headless browsers aggressively. This is a GitHub limitation, not ours. We handle the error gracefully.
 
 **Q:** How is this different from Chrome DevTools MCP?  
-**A:** Chrome DevTools MCP is TypeScript-only, Chrome-only, and designed for frontend debugging. Our tool is Python-native, multi-browser, and designed for general web interaction.
+**A:** Chrome DevTools MCP is TypeScript-only, Chrome-only, and designed for frontend debugging. Our tool is Python-native, multi-browser, and designed for general web interaction with OpenCode.
+
+| Feature | This Project | Chrome DevTools MCP | browser-use |
+|---------|:---:|:---:|:---:|
+| Language | Python | TypeScript | Python |
+| Browsers | All | Chrome only | All |
+| Snapshot + UIDs |   |   | — |
+| Multi-tab |   |   | — |
+| Console monitoring |   |   | — |
+| Network inspection |   |   | — |
+| Device emulation |   |   | — |
+| Performance tracing |   |   | — |
+| Core Web Vitals |   |   | — |
+| Heap snapshots | — |   | — |
+| Lighthouse audit | — |   | — |
+| Open source | MIT | Apache 2.0 | MIT |
+| Install size | ~5KB Python | ~500KB npm | ~25MB pip |
 
 ---
 
